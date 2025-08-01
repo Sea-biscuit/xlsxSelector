@@ -1,6 +1,6 @@
 # xlsxSelector
 一个简单的Excel截取表格导出脚本
-### 关于一些小问题2
+### 关于一些小问题
 导出的时候命名会以xxxx_part1.xlsx开始输出，part1开始到partxxx，暂时无法修改输出格式  
 这个以后再说
 
