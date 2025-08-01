@@ -80,21 +80,27 @@ def split_excel_or_csv():
 
     # 5. 指定起始行和结束行
     try:
-        start_row_input = input("请输入起始行号（从 0 开始）（如果您需要从第5行开始截取，您需要输入4）: ").strip()
-        start_row = int(start_row_input) if start_row_input else 0
-        if start_row < 0 or start_row >= total_rows:
-            print(f"起始行必须在 0 到 {total_rows - 1} 之间")
-            sys.exit(1)
+        start_row_input = input("请输入起始行号（从 1 开始，即第1行为1）: ").strip()
+        if not start_row_input:
+            start_row = 0
+        else:
+            start_row = int(start_row_input) - 1  # 转为索引
+            if start_row < 0 or start_row >= total_rows:
+                print(f"起始行必须在 1 到 {total_rows} 之间")
+                sys.exit(1)
     except ValueError:
         print("请输入有效数字！")
         sys.exit(1)
 
-    end_row_input = input("请输入结束行号（留空表示到最后）: ").strip()
+    end_row_input = input("请输入结束行号（从 1 开始，留空表示到最后）: ").strip()
     if end_row_input:
         try:
             end_row = int(end_row_input)
-            if end_row <= start_row or end_row > total_rows:
-                print(f"结束行必须大于起始行且不超过 {total_rows}")
+            if end_row <= 0 or end_row > total_rows:
+                print(f"结束行必须在 1 到 {total_rows} 之间")
+                sys.exit(1)
+            if end_row <= start_row + 1:  # 因为 start_row 是索引，+1 才是自然行号
+                print("结束行必须大于起始行！")
                 sys.exit(1)
         except ValueError:
             print("请输入有效数字或留空！")
