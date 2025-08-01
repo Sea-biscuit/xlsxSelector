@@ -144,7 +144,8 @@ def split_excel_or_csv():
 
         try:
             if output_ext == ".csv":
-                chunk_df.to_csv(output_file, index=False, encoding='utf-8')
+                # 使用 utf-8-sig 编码以支持包含汉字等Unicode字符的CSV文件
+                chunk_df.to_csv(output_file, index=False, encoding='utf-8-sig')
             else:
                 chunk_df.to_excel(output_file, index=False, sheet_name="Sheet1")
             print(f"✓ 已保存: {output_file} ({len(chunk_df)} 行)")
