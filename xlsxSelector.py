@@ -3,6 +3,8 @@ import numpy as np
 import os
 import sys
 from pathlib import Path
+from fuzzywuzzy import fuzz
+
 
 # ========================
 # 工具函数
@@ -17,6 +19,7 @@ def get_user_choice(prompt, valid_choices, default=None):
             return choice
         print(f"输入无效，请输入 {'/'.join(valid_choices)}")
 
+
 def exit_or_continue():
     """询问是否继续使用工具"""
     print("\n" + "=" * 50)
@@ -29,6 +32,7 @@ def exit_or_continue():
     else:
         print(" 👋  感谢使用，再见！")
         sys.exit(0)
+
 
 # ========================
 # 合并功能
@@ -194,6 +198,7 @@ def merge_files():
     except Exception as e:
         print(f" ❌  保存失败: {type(e).__name__}: {e}")
 
+
 def count_csv_lines(file_path):
     encodings = ['utf-8', 'gbk', 'utf-8-sig', 'cp1252', 'latin1']
     for encoding in encodings:
@@ -203,6 +208,7 @@ def count_csv_lines(file_path):
         except:
             continue
     return None, None
+
 
 # ========================
 # 分割功能
@@ -217,6 +223,7 @@ def get_file_path(prompt):
             print("错误：文件格式不支持，请确保是 .xlsx 或 .csv 文件。")
         else:
             return file_path
+
 
 def get_output_dir(prompt):
     """获取有效的输出目录"""
@@ -233,6 +240,7 @@ def get_output_dir(prompt):
                 print(f"无法创建目录：{e}，请重新输入。")
         else:
             return output_dir
+
 
 def read_and_process_file(file_path):
     """读取文件并处理列名"""
@@ -273,6 +281,7 @@ def read_and_process_file(file_path):
     except Exception as e:
         print(f"读取文件时发生错误：{e}")
         return None
+
 
 def slice_by_count(df):
     """按行数截取"""
@@ -315,6 +324,7 @@ def slice_by_count(df):
             break
         sliced_dfs.append(df.iloc[start:end])
     return sliced_dfs
+
 
 def slice_by_end_row(df):
     """按行范围截取"""
@@ -361,6 +371,7 @@ def slice_by_end_row(df):
         end = start + slice_length
         sliced_dfs.append(df.iloc[start:end])
     return sliced_dfs
+
 
 def split_excel_or_csv():
     print("\n" + "=" * 40)
@@ -411,6 +422,7 @@ def split_excel_or_csv():
             print(f" ❌  保存失败 {output_path}: {e}")
     print("\n所有截取操作已完成！")
 
+
 # ========================
 # 查重功能
 # ========================
@@ -431,7 +443,8 @@ def read_file(file_path, sheet=None):
     except Exception as e:
         raise RuntimeError(f"读取文件失败 {file_path}: {e}")
 
-def get_column_data(df, column, is_email=False):
+
+def get_column_data(df, column):
     """
     支持三种输入方式：
     1. 列名（如 'email'）
@@ -443,16 +456,12 @@ def get_column_data(df, column, is_email=False):
     # 情况1：先尝试当作列名查找
     if col_key in df.columns:
         cleaned_series = df[col_key].astype(str).str.strip()
-        if is_email:
-            cleaned_series = cleaned_series.str.lower()
         return set(cleaned_series.dropna())
     # 情况2：如果不是列名，再尝试当作列序号（纯数字）
     if col_key.isdigit():
         idx = int(col_key) - 1  # 转为从0开始
         if 0 <= idx < len(df.columns):
             cleaned_series = df.iloc[:, idx].astype(str).str.strip()
-            if is_email:
-                cleaned_series = cleaned_series.str.lower()
             return set(cleaned_series.dropna())
         else:
             raise ValueError(f"列序号 {int(col_key)} 超出范围 [1, {len(df.columns)}]")
@@ -461,14 +470,13 @@ def get_column_data(df, column, is_email=False):
         idx = ord(col_key.upper()) - ord('A')
         if 0 <= idx < len(df.columns):
             cleaned_series = df.iloc[:, idx].astype(str).str.strip()
-            if is_email:
-                cleaned_series = cleaned_series.str.lower()
             return set(cleaned_series.dropna())
         else:
             raise ValueError(f"列字母 '{col_key}' 超出范围 [A-{chr(ord('A') + len(df.columns) - 1)}]")
     # 都不匹配，报错
     available_cols = list(df.columns)
     raise ValueError(f"无法找到列 '{col_key}'。可用列名：{available_cols}")
+
 
 def select_sheet(sheet_names):
     # 每个 Sheet 名用 ' ' 包裹，逗号分隔，不加 [ ]
@@ -492,6 +500,7 @@ def select_sheet(sheet_names):
         else:
             print(f"未找到 Sheet '{choice}'，使用默认 [{default_sheet}]")
             return default_sheet
+
 
 def deduplicate_files():
     print("\n" + "=" * 40)
@@ -523,11 +532,29 @@ def deduplicate_files():
         print("列名不能为空！")
         return
 
-    # 询问是否为邮箱查重
-    is_email_check = get_user_choice(
-        "该列是否为邮箱地址？(y/n, 默认 n): ",
-        ['y', 'n'], 'n'
-    ) == 'y'
+    # 询问查重模式
+    print("\n请选择查重模式:")
+    print("1. 精确查重 (默认)")
+    print("2. 邮箱查重 (不区分大小写，自动处理空格)")
+    print("3. 模糊查重 (根据相似度阈值//不要试图用该方法查邮件！)")
+    dedupe_mode = get_user_choice("请选择查重模式 (1/2/3, 默认 1): ", ['1', '2', '3'], '1')
+
+    fuzzy_threshold = 0
+    if dedupe_mode == '3':
+        while True:
+            try:
+                print("模糊查重真的很慢，请耐心等待:<\n")
+                threshold_input = input("请输入模糊匹配相似度阈值（0-100，建议90以上，默认95）: ")
+                if not threshold_input:
+                    fuzzy_threshold = 95
+                else:
+                    fuzzy_threshold = int(threshold_input)
+                if 0 <= fuzzy_threshold <= 100:
+                    break
+                else:
+                    print("阈值必须在0-100之间！")
+            except ValueError:
+                print("输入无效，请输入一个整数。")
 
     # 2. 输入对比文件
     print("\n请输入对比文件路径（多个用分号 ; 分隔，或一行一个，空行结束）:")
@@ -584,29 +611,53 @@ def deduplicate_files():
     # 4. 查重处理
     print("\n开始查重处理...")
     try:
-        main_values_set = get_column_data(main_df, main_column, is_email=is_email_check)
-        print(f"主文件 '{main_column}' 列共 {len(main_values_set)} 个唯一值（仅用于检查）。")
         all_ref_values = set()
         for config in ref_configs:
             df = config['df']
             col = config['column']
             print(f"处理: {config['file'].name} [{config['sheet']}] 列 '{col}'")
-            values = get_column_data(df, col, is_email=is_email_check)
+            values = get_column_data(df, col)
             all_ref_values.update(values)
             print(f"添加 {len(values)} 个值，累计 {len(all_ref_values)} 个。")
         print(f"总共 {len(all_ref_values)} 个用于查重的值。")
-        def is_duplicate(row):
-            key = row.get(main_column)
-            if pd.isna(key) or key is None:
+
+        # 根据查重模式应用不同的查重函数
+        if dedupe_mode == '2':  # 邮箱查重
+            lower_ref_values = {v.lower() for v in all_ref_values}
+
+            def is_duplicate(row):
+                key = row.get(main_column)
+                if pd.isna(key) or key is None:
+                    return False
+                cleaned_key = str(key).strip().lower()
+                return cleaned_key in lower_ref_values
+        elif dedupe_mode == '3':  # 模糊查重
+            ref_list = list(all_ref_values)  # 转换为列表以便迭代
+
+            def is_duplicate(row):
+                key = row.get(main_column)
+                if pd.isna(key) or key is None:
+                    return False
+                cleaned_key = str(key).strip()
+                for ref_value in ref_list:
+                    if fuzz.ratio(cleaned_key, ref_value) >= fuzzy_threshold:
+                        print(
+                            f"模糊匹配到：主文件'{cleaned_key}' vs. 对比文件'{ref_value}'，相似度 {fuzz.ratio(cleaned_key, ref_value)}%")
+                        return True
                 return False
-            cleaned_key = str(key).strip()
-            if is_email_check:
-                cleaned_key = cleaned_key.lower()
-            return cleaned_key in all_ref_values
+        else:  # 精确查重 (默认)
+            def is_duplicate(row):
+                key = row.get(main_column)
+                if pd.isna(key) or key is None:
+                    return False
+                cleaned_key = str(key).strip()
+                return cleaned_key in all_ref_values
+
         mask = main_df.apply(is_duplicate, axis=1)
         removed_count = mask.sum()
         filtered_df = main_df[~mask]
         print(f"查重完成！删除 {removed_count} 行，剩余 {len(filtered_df)} 行。")
+
         # 5. 保存结果
         output_path = input("\n请输入保存路径（如 result.xlsx）: ").strip().strip('"\'')
         if not output_path:
@@ -624,6 +675,7 @@ def deduplicate_files():
     except Exception as e:
         print(f"处理失败: {e}")
         return
+
 
 # ========================
 # 清理空行功能
@@ -713,6 +765,7 @@ def clean_spreadsheet_main():
     except Exception as e:
         print(f"\n ❌  程序执行出错: {e}")
 
+
 def clean_spreadsheet(input_path, output_path, check_columns):
     """
     读取 CSV/XLSX 文件，删除指定列中为空的行，并保存结果。
@@ -760,6 +813,7 @@ def clean_spreadsheet(input_path, output_path, check_columns):
     except Exception as e:
         raise Exception(f"保存文件失败: {e}")
 
+
 # ========================
 # 主程序入口
 # ========================
@@ -789,6 +843,7 @@ def main():
             sys.exit(0)
         # 询问是否继续
         exit_or_continue()
+
 
 if __name__ == "__main__":
     try:
