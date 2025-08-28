@@ -48,7 +48,7 @@ def merge_files():
     )
     file_paths = []
     if input_type == "1":
-        paths_input = input("请输入文件路径（空格分隔）: ").strip()
+        paths_input = input("请输入文件路径（空格分隔）: ").strip().strip('"\'')
         if not paths_input:
             print(" ❌  未输入文件路径！")
             return
@@ -58,7 +58,7 @@ def merge_files():
                 print(f" ❌  文件不存在: {fp}")
                 return
     else:
-        folder_path = input("请输入文件夹路径: ").strip()
+        folder_path = input("请输入文件夹路径: ").strip().strip('"\'')
         if not folder_path:
             folder_path = "."
         if not os.path.exists(folder_path) or not os.path.isdir(folder_path):
