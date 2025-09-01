@@ -43,16 +43,29 @@ def merge_files():
     print("=" * 40 + "\n")
     # 1. 输入文件或文件夹
     input_type = get_user_choice(
-        "请选择输入方式: 1) 多个文件路径 (空格分隔)  2) 整个文件夹（默认 2）: ",
+        "请选择输入方式: 1) 多个文件路径 (分号/换行分隔)  2) 整个文件夹（默认 2）: ",
         ['1', '2'], '2'
     )
     file_paths = []
     if input_type == "1":
-        paths_input = input("请输入文件路径（空格分隔）: ").strip().strip('"\'')
-        if not paths_input:
+        # 核心修改部分：混合分号和换行分隔，通过空行结束
+        print("请输入文件路径，可使用分号或换行分隔。输入空行并回车结束:")
+        paths_input_lines = []
+        while True:
+            line = input().strip()
+            if not line:
+                break
+            paths_input_lines.append(line)
+
+        # 将所有行连接成一个字符串，然后用分号分割
+        all_paths_str = ";".join(paths_input_lines)
+        # 对分割后的每个路径进行处理，移除多余的引号和空格
+        file_paths = [p.strip().strip('"\'') for p in all_paths_str.split(';') if p.strip()]
+
+        if not file_paths:
             print(" ❌  未输入文件路径！")
             return
-        file_paths = paths_input.split()
+
         for fp in file_paths:
             if not os.path.exists(fp):
                 print(f" ❌  文件不存在: {fp}")
@@ -140,7 +153,7 @@ def merge_files():
             selected_columns = sorted(all_columns)
     # 5. 重命名列
     print(f"\n 📤  当前输出列: {selected_columns}")
-    rename_choice = get_user_choice("是否要重命名输出列？(y/n, 2020-01-20): ", ['y', 'n'], 'n')
+    rename_choice = get_user_choice("是否要重命名输出列？(y/n, 默认n): ", ['y', 'n'], 'n')
     column_mapping = {}
     if rename_choice == 'y':
         print("请为每一列输入新的列名（留空则保持原名）:")
@@ -156,17 +169,30 @@ def merge_files():
     clean_empty = get_user_choice("是否删除？(y/n, 默认 y): ", ['y', 'n'], 'y') == 'y'
     # 7. 合并
     merged_rows = 0
-    combined_df = pd.DataFrame(columns=final_columns)
+    combined_df = None  # 核心修改：初始化为None，以便第一个DataFrame作为合并起点
+
     print("\n 🔄  正在合并数据...")
     for i, (file, df) in enumerate(dataframes):
         temp_df = df.reindex(columns=selected_columns)
         temp_df.columns = final_columns
+
+        # 处理空值
         if clean_empty:
             temp_df.replace(r'^\s*$', np.nan, regex=True, inplace=True)
             temp_df.dropna(how='all', inplace=True)
-        combined_df = pd.concat([combined_df, temp_df], ignore_index=True)
+
+        if combined_df is None:
+            combined_df = temp_df.copy()
+        else:
+            combined_df = pd.concat([combined_df, temp_df], ignore_index=True)
+
         merged_rows += len(temp_df)
         print(f"   ✔️  已合并: {os.path.basename(file)} -> {len(temp_df)} 行")
+
+    if combined_df is None:
+        print(" ❌  没有成功读取任何文件！")
+        return
+
     print(f" ✅  合并完成！共合并 {merged_rows} 行数据。")
     expected_data_rows = sum([len(df) for _, df in dataframes])
     if merged_rows != expected_data_rows:
@@ -174,6 +200,7 @@ def merge_files():
         print(f"    可能原因：检测到 {expected_data_rows - merged_rows} 行全空（或全空白），已被删除。")
     else:
         print(f" ✅  数据行数匹配，合并完整。")
+
     # 8. 输出
     output_format = get_user_choice("请选择输出格式: 1) CSV  2) XLSX（默认 1）: ", ['1', '2'], '1')
     output_ext = ".xlsx" if output_format == "2" else ".csv"

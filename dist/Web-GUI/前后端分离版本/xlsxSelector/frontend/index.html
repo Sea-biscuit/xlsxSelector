@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>xlsxSelector</title>
+    <link rel="stylesheet" href="style.css"> <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; margin: 0; padding: 2em; background-color: #f8f9fa; display: flex; justify-content: center; }
+        .container { max-width: 900px; width: 100%; padding: 20px; background-color: #fff; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+        h1 { text-align: center; color: #343a40; margin-bottom: 20px; }
+        .tab-buttons { display: flex; margin-bottom: 20px; border-bottom: 2px solid #e9ecef; }
+        .tab-button { flex: 1; text-align: center; padding: 12px; cursor: pointer; border: none; background: none; font-size: 16px; transition: background-color 0.3s; color: #6c757d; }
+        .tab-button.active { font-weight: bold; border-bottom: 2px solid #007bff; color: #007bff; }
+        .tab-content { padding-top: 20px; }
+        .tab-pane { display: none; }
+        .tab-pane.active { display: block; }
+        .form-section { margin-bottom: 20px; padding: 15px; border: 1px solid #ced4da; border-radius: 6px; background-color: #fafafa; }
+        label { font-weight: bold; display: block; margin-bottom: 5px; color: #495057; }
+        input[type="text"], input[type="number"], input[type="file"], select { width: 100%; padding: 10px; margin-bottom: 10px; border: 1px solid #ced4da; border-radius: 4px; box-sizing: border-box; }
+        input[type="submit"] { width: 100%; padding: 12px; border: none; border-radius: 4px; color: #fff; background-color: #007bff; cursor: pointer; font-size: 16px; transition: background-color 0.3s; }
+        input[type="submit"]:hover { background-color: #0056b3; }
+        .alert { padding: 15px; margin-bottom: 20px; border-radius: 4px; font-weight: bold; }
+        .alert-success { color: #155724; background-color: #d4edda; border: 1px solid #c3e6cb; }
+        .alert-danger { color: #721c24; background-color: #f8d7da; border: 1px solid #f5c6cb; }
+        .flex-container { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+        .flex-item { flex: 1; min-width: 250px; }
+        .column-selection { margin-top: 10px; background-color: #f1f1f1; padding: 10px; border-radius: 4px; border: 1px solid #ddd; }
+        .column-button { display: inline-block; padding: 5px 10px; margin: 3px; cursor: pointer; border: 1px solid #007bff; background-color: #e6f3ff; color: #007bff; border-radius: 4px; font-size: 14px; transition: background-color 0.2s, color 0.2s; }
+        .column-button.selected { background-color: #007bff; color: white; }
+        input[type="radio"] { margin-right: 5px; }
+        .file-list { margin-top: 10px; padding: 10px; background-color: #f8f8f8; border: 1px solid #eee; border-radius: 4px; }
+        .file-item { display: flex; justify-content: space-between; align-items: center; padding: 5px 0; border-bottom: 1px solid #eee; font-size: 14px; }
+        .file-item:last-child { border-bottom: none; }
+        .remove-file { color: #dc3545; cursor: pointer; }
+        .rename-input-group { display: flex; gap: 10px; margin-top: 10px;}
+        .rename-input-group input { flex: 1; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>xlsxSelector</h1>
+        <div class="tab-buttons">
+            <button class="tab-button active" onclick="showTab('merge')">合并文件</button>
+            <button class="tab-button" onclick="showTab('split')">分割文件</button>
+            <button class="tab-button" onclick="showTab('deduplicate')">查重删除</button>
+            <button class="tab-button" onclick="showTab('clean')">清理空行</button>
+        </div>
+
+        <div class="tab-content">
+            <div id="merge" class="tab-pane active">
+                <form id="merge-form" action="/api/merge" method="post" enctype="multipart/form-data">
+                    <div class="form-section">
+                        <label>选择文件（可多次添加）：</label>
+                        <input type="file" id="merge-file-input" multiple>
+                        <div id="merge-file-list" class="file-list"></div>
+                    </div>
+                    <div class="form-section">
+                        <label>选择输出列名（可选，不选则按原样合并）：</label>
+                        <input type="text" name="merge_cols" id="merge_cols_input">
+                        <div id="merge-columns" class="column-selection"></div>
+                        <label>重命名列名（可选，与上行对应）：</label>
+                        <input type="text" name="rename_cols" id="merge_rename_cols_input">
+                    </div>
+                    <div class="form-section">
+                        <div class="flex-container">
+                            <div class="flex-item">
+                                <label>输出文件名：</label>
+                                <input type="text" name="output_name" value="merged_output">
+                            </div>
+                            <div class="flex-item">
+                                <label>输出格式：</label>
+                                <label><input type="radio" name="format" value="csv" checked> CSV</label>
+                                <label><input type="radio" name="format" value="xlsx"> XLSX</label>
+                            </div>
+                        </div>
+                    </div>
+                    <input type="submit" value="开始合并">
+                </form>
+            </div>
+
+            <div id="split" class="tab-pane">
+                <form id="split-form" action="/api/split" method="post" enctype="multipart/form-data">
+                    <div class="form-section">
+                        <label>选择文件：</label>
+                        <input type="file" name="file" required onchange="window.getColumns(this.files[0], 'split-columns', 'split_output_cols_input', true, 'split-info')">
+                        <p id="split-info"></p>
+                    </div>
+                    <div class="form-section">
+                        <label>选择输出列名（可选，不选则输出所有列）：</label>
+                        <input type="text" name="output_cols" id="split_output_cols_input">
+                        <div id="split-columns" class="column-selection"></div>
+                        <label>重命名列名（可选，与上行对应）：</label>
+                        <input type="text" name="rename_cols" id="split_rename_cols_input">
+                    </div>
+                    <div class="form-section">
+                        <div class="flex-container">
+                            <div class="flex-item">
+                                <label>输出文件前缀：</label>
+                                <input type="text" name="output_name" value="split_output">
+                            </div>
+                            <div class="flex-item">
+                                <label>输出格式：</label>
+                                <label><input type="radio" name="format" value="csv" checked> CSV</label>
+                                <label><input type="radio" name="format" value="xlsx"> XLSX</label>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="form-section">
+                        <label>选择分割方式：</label>
+                        <label><input type="radio" name="method" value="count" checked> 按行数</label>
+                        <label><input type="radio" name="method" value="range"> 按行范围</label>
+                    </div>
+                    <div class="form-section split-count">
+                        <label>开始行数（从1开始）：</label>
+                        <input type="number" name="start_row" value="1" min="1">
+                        <label>每次截取行数：</label>
+                        <input type="number" name="row_count" value="1000" min="1">
+                        <label>截取次数：</label>
+                        <input type="number" name="times" value="1" min="1">
+                    </div>
+                    <div class="form-section split-range" style="display:none;">
+                        <label>开始行数（从1开始）：</label>
+                        <input type="number" name="range_start" value="1" min="1">
+                        <label>结束行数（不包含此行）：</label>
+                        <input type="number" name="range_end" value="1000" min="2">
+                        <label>分成几段：</label>
+                        <input type="number" name="sections" value="2" min="1">
+                    </div>
+                    <input type="submit" value="开始分割">
+                </form>
+            </div>
+
+            <div id="deduplicate" class="tab-pane">
+                <form id="dedupe-form" action="/api/deduplicate" method="post" enctype="multipart/form-data">
+                    <div class="form-section">
+                        <label>主文件：</label>
+                        <input type="file" name="main_file_input" required onchange="window.getColumns(this.files[0], 'dedupe-main-columns', 'dedupe_main_col_input', false)">
+                        <label>主文件比较列名：</label>
+                        <input type="text" name="main_col" id="dedupe_main_col_input" required>
+                        <div id="dedupe-main-columns" class="column-selection"></div>
+                    </div>
+                    <div class="form-section">
+                        <label>对比文件（可多次添加）：</label>
+                        <input type="file" id="dedupe-ref-input" multiple>
+                        <div id="dedupe-ref-list" class="file-list"></div>
+                    </div>
+                    <div class="form-section">
+                        <label>查重模式：</label>
+                        <label><input type="radio" name="mode" value="exact" checked onclick="toggleFuzzyThreshold()"> 精确查重</label>
+                        <label><input type="radio" name="mode" value="email" onclick="toggleFuzzyThreshold()"> 邮箱查重</label>
+                        <label><input type="radio" name="mode" value="fuzzy" onclick="toggleFuzzyThreshold()"> 模糊查重</label>
+                    </div>
+                    <div class="form-section" id="fuzzy-threshold-container" style="display: none;">
+                        <label>模糊查重阈值（0-100）：</label>
+                        <input type="number" name="fuzzy_threshold" value="80" min="0" max="100">
+                    </div>
+                    <div class="form-section">
+                        <label>输出文件名：</label>
+                        <input type="text" name="output_name" value="deduplicated">
+                    </div>
+                    <div class="form-section">
+                        <label>输出格式：</label>
+                        <label><input type="radio" name="format" value="csv"> CSV</label>
+                        <label><input type="radio" name="format" value="xlsx" checked> XLSX</label>
+                    </div>
+                    <input type="submit" value="开始查重">
+                </form>
+            </div>
+
+            <div id="clean" class="tab-pane">
+                <form id="clean-form" action="/api/clean" method="post" enctype="multipart/form-data">
+                    <div class="form-section">
+                        <label>选择文件：</label>
+                        <input type="file" name="file" required onchange="window.getColumns(this.files[0], 'clean-columns', 'clean_cols_input', true)">
+                        <p id="clean-info"></p>
+                    </div>
+                    <div class="form-section">
+                        <label>要检查的列名（逗号分隔）：</label>
+                        <input type="text" name="cols" id="clean_cols_input" required>
+                        <div id="clean-columns" class="column-selection"></div>
+                    </div>
+                    <div class="form-section">
+                        <label>输出文件名：</label>
+                        <input type="text" name="output_name" value="cleaned_output">
+                    </div>
+                    <input type="submit" value="开始清理">
+                </form>
+            </div>
+        </div>
+        <div id="status-message"></div>
+    </div>
+    
+    <script src="main.js"></script>
+</body>
+</html>
